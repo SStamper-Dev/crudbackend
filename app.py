@@ -28,7 +28,7 @@ def add_order():
         data = request.json
         db = get_db_connection() # connects only when request comes in
         cursor = db.cursor()
-        sql = "INSERT INTO orders (customer_name, pizza_size) VALUES (%s, %s)"
+        sql = "INSERT INTO testorders (customer_name, pizza_size) VALUES (%s, %s)"
         cursor.execute(sql, (data['name'], data['size']))
         db.commit()
         cursor.close()
