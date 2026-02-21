@@ -22,6 +22,11 @@ def get_db_connection():
 def health():
     return jsonify({"status": "alive"}), 200
 
+@app.route('/test', methods=['POST'])
+def test_no_sql():
+    # This route DOES NOT touch the database
+    return jsonify({"message": "The wire is working! Python is alive."}), 200
+
 @app.route('/add', methods=['POST'])
 def add_order():
     try:
