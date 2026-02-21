@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 from flask_cors import CORS
-CORS(app) # This tells the server it's okay to accept requests from your Netlify domain.
 
 from flask import Flask, request, jsonify
 import mysql.connector
@@ -9,6 +8,7 @@ import mysql.connector
 # Database Connection
 load_dotenv()
 app = Flask(__name__)
+CORS(app)  # This tells the server it's okay to accept requests from your Netlify domain.
 
 db = mysql.connector.connect(
     host=os.getenv("DB_HOST"),
