@@ -5,7 +5,8 @@ import mysql.connector
 
 # load config
 app = Flask(__name__)
-CORS(app) 
+# server allows ANY website to read the JSON
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # connection function
 def get_db_connection():
