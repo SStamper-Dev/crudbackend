@@ -21,6 +21,7 @@ def get_db_connection():
 def test_no_sql():
     return jsonify({"message": "The wire is working! Python is alive."}), 200
 
+# CREATE
 @app.route('/add-pizza', methods=['POST'])
 def add_pizza_order():
     db = None
@@ -51,3 +52,57 @@ def add_pizza_order():
     finally:
         if db:
             db.close()
+
+# READ
+@app.route('/pizzas', methods=['GET'])
+def get_pizzas():
+    db = get_db_connection()
+    cursor = db.cursor(dictionary=True) # Returns data as a dictionary
+    
+    # use JOIN to get pizza details and associated toppings
+    query = """
+    SELECT p.*, GROUP_CONCAT(t.name) as topping_names 
+    FROM pizza p
+    LEFT JOIN pizza_topping pt ON p.id = pt.pizza_id
+    LEFT JOIN topping t ON pt.topping_id = t.id
+    GROUP BY p.id
+    """
+    cursor.execute(query)
+    pizzas = cursor.fetchall()
+    db.close()
+    return jsonify(pizzas), 200
+
+# UPDATE
+@app.route('/update-pizza/<int:id>', methods=['PUT'])
+def update_pizza(id):
+    data = request.json
+    db = get_db_connection()
+    cursor = db.cursor()
+    try:
+        # update the main pizza details
+        cursor.execute("UPDATE pizza SET crust=%s, size=%s, order_type=%s WHERE id=%s", 
+                       (data['crust'], data['size'], data['order_type'], id))
+        
+        # to update toppings, I wipe the old links and add new ones
+        cursor.execute("DELETE FROM pizza_topping WHERE pizza_id=%s", (id,))
+        if 'toppings' in data:
+            topping_data = [(id, t_id) for t_id in data['toppings']]
+            cursor.executemany("INSERT INTO pizza_topping (pizza_id, topping_id) VALUES (%s, %s)", topping_data)
+        
+        db.commit()
+        return jsonify({"message": "Update successful"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+# DELETE
+@app.route('/delete-pizza/<int:id>', methods=['DELETE'])
+def delete_pizza(id):
+    db = get_db_connection()
+    cursor = db.cursor()
+    # cascade deletes with toppings
+    cursor.execute("DELETE FROM pizza WHERE id=%s", (id,))
+    db.commit()
+    db.close()
+    return jsonify({"message": "Pizza deleted"}), 200
