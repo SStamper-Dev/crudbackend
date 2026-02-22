@@ -27,26 +27,31 @@ def test_no_sql():
 def add_pizza_order():
     db = None
     try:
-        data = request.json # this expects {crust, size, order_type, toppings: [id1, id2]}
+        data = request.json
         db = get_db_connection()
         cursor = db.cursor()
 
-        # insert into the 'pizza' table (matches your new DDL)
+        # 1. ENUM Match Check: Ensure 'Dine-in' becomes 'Dine-In'
+        order_type = data['order_type'].replace('Dine-in', 'Dine-In')
+
         pizza_sql = "INSERT INTO pizza (crust, size, order_type) VALUES (%s, %s, %s)"
-        cursor.execute(pizza_sql, (data['crust'], data['size'], data['order_type']))
-        
-        # Get the ID of the pizza we just created to link toppings
+        cursor.execute(pizza_sql, (data['crust'], data['size'], order_type))
         pizza_id = cursor.lastrowid 
 
-        # insert into the 'pizza_topping' junction table
+        # 2. Convert Topping Names to IDs
         if 'toppings' in data and data['toppings']:
+            # Find IDs for names like "Pepperoni"
+            format_strings = ','.join(['%s'] * len(data['toppings']))
+            cursor.execute(f"SELECT id FROM topping WHERE name IN ({format_strings})", 
+                           tuple(data['toppings']))
+            topping_ids = [row[0] for row in cursor.fetchall()]
+
+            # Insert links into the junction table
             topping_sql = "INSERT INTO pizza_topping (pizza_id, topping_id) VALUES (%s, %s)"
-            # creates link for every topping selected
-            topping_data = [(pizza_id, t_id) for t_id in data['toppings']]
+            topping_data = [(pizza_id, t_id) for t_id in topping_ids]
             cursor.executemany(topping_sql, topping_data)
 
         db.commit()
-        cursor.close()
         return jsonify({"message": f"Pizza #{pizza_id} recorded!"}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
