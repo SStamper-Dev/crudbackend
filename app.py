@@ -85,15 +85,25 @@ def update_pizza(id):
     db = get_db_connection()
     cursor = db.cursor()
     try:
-        # update the main pizza details
+        # 1. Match the ENUM case for 'Dine-In'
+        order_type = data['order_type'].replace('Dine-in', 'Dine-In')
+
         cursor.execute("UPDATE pizza SET crust=%s, size=%s, order_type=%s WHERE id=%s", 
-                       (data['crust'], data['size'], data['order_type'], id))
+                       (data['crust'], data['size'], order_type, id))
         
-        # to update toppings, I wipe the old links and add new ones
+        # 2. Wipe old toppings
         cursor.execute("DELETE FROM pizza_topping WHERE pizza_id=%s", (id,))
-        if 'toppings' in data:
-            topping_data = [(id, t_id) for t_id in data['toppings']]
-            cursor.executemany("INSERT INTO pizza_topping (pizza_id, topping_id) VALUES (%s, %s)", topping_data)
+        
+        # 3. Lookup IDs for names sent by the frontend
+        if 'toppings' in data and data['toppings']:
+            format_strings = ','.join(['%s'] * len(data['toppings']))
+            cursor.execute(f"SELECT id FROM topping WHERE name IN ({format_strings})", 
+                           tuple(data['toppings']))
+            topping_ids = [row[0] for row in cursor.fetchall()]
+
+            topping_sql = "INSERT INTO pizza_topping (pizza_id, topping_id) VALUES (%s, %s)"
+            topping_data = [(id, t_id) for t_id in topping_ids]
+            cursor.executemany(topping_sql, topping_data)
         
         db.commit()
         return jsonify({"message": "Update successful"}), 200
@@ -101,7 +111,7 @@ def update_pizza(id):
         return jsonify({"error": str(e)}), 500
     finally:
         db.close()
-
+        
 # DELETE
 @app.route('/delete-pizza/<int:id>', methods=['DELETE'])
 def delete_pizza(id):
