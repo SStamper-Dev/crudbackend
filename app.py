@@ -1,11 +1,9 @@
 import os
-from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mysql.connector
 
 # load config
-load_dotenv()
 app = Flask(__name__)
 CORS(app) 
 
@@ -19,31 +17,37 @@ def get_db_connection():
         port=int(os.getenv("DB_PORT", 3306))
     )
 
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"status": "alive"}), 200
-
 @app.route('/test', methods=['POST'])
 def test_no_sql():
-    # This route DOES NOT touch the database
     return jsonify({"message": "The wire is working! Python is alive."}), 200
 
-@app.route('/add', methods=['POST'])
-def add_order():
+@app.route('/add-pizza', methods=['POST'])
+def add_pizza_order():
+    db = None
     try:
-        data = request.json
-        db = get_db_connection() # connects only when request comes in
+        data = request.json # this expects {crust, size, order_type, toppings: [id1, id2]}
+        db = get_db_connection()
         cursor = db.cursor()
-        sql = "INSERT INTO testorders (customer_name, pizza_size) VALUES (%s, %s)"
-        cursor.execute(sql, (data['name'], data['size']))
+
+        # insert into the 'pizza' table (matches your new DDL)
+        pizza_sql = "INSERT INTO pizza (crust, size, order_type) VALUES (%s, %s, %s)"
+        cursor.execute(pizza_sql, (data['crust'], data['size'], data['order_type']))
+        
+        # Get the ID of the pizza we just created to link toppings
+        pizza_id = cursor.lastrowid 
+
+        # insert into the 'pizza_topping' junction table
+        if 'toppings' in data and data['toppings']:
+            topping_sql = "INSERT INTO pizza_topping (pizza_id, topping_id) VALUES (%s, %s)"
+            # creates link for every topping selected
+            topping_data = [(pizza_id, t_id) for t_id in data['toppings']]
+            cursor.executemany(topping_sql, topping_data)
+
         db.commit()
         cursor.close()
-        db.close()
-        return jsonify({"message": "Order added to SQL!"}), 201
+        return jsonify({"message": f"Pizza #{pizza_id} recorded!"}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-# oort binding
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    finally:
+        if db:
+            db.close()
