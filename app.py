@@ -6,7 +6,7 @@ import mysql.connector
 # load config
 app = Flask(__name__)
 # server allows ANY website to read the JSON
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "https://sethstamper.com"}})
 
 # connection function
 def get_db_connection():
@@ -111,7 +111,7 @@ def update_pizza(id):
         return jsonify({"error": str(e)}), 500
     finally:
         db.close()
-        
+
 # DELETE
 @app.route('/delete-pizza/<int:id>', methods=['DELETE'])
 def delete_pizza(id):
